@@ -1,0 +1,1 @@
+export const CARD_MAX_SCORE = 2;
