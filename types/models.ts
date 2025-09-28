@@ -1,8 +1,8 @@
-import { DeckData } from "./deck";
+import { DeckData, DeckProgressData } from "./deck";
 import { ObjectId } from "mongodb";
 
-export interface UserModel {
-    _id: ObjectId | null;
+export interface UserModelServer {
+    _id: ObjectId;
     name?: string | null;
     email: string;
     image?: string | null;
@@ -10,10 +10,14 @@ export interface UserModel {
     updated_at: Date;
 }
 
-export type AuthUser = UserModel | null;
+export interface UserModel extends Omit<UserModelServer, "_id"> {
+    id: string;
+}
 
-export interface DeckModel {
-    _id: ObjectId | null;
+export type AuthUser = UserModel | null | undefined;
+
+export interface DeckModelServer {
+    _id: ObjectId;
     title: string;
     description?: string;
     category?: string;
@@ -21,7 +25,27 @@ export interface DeckModel {
     is_private: boolean;
     created_at: Date;
     updated_at: Date;
-    user_id: ObjectId | null;
+    user_id: ObjectId;
 }
 
-export type DeckWithUser = {deck: DeckModel, user: UserModel};
+export interface DeckModel extends Omit<DeckModelServer, "_id" | "user_id"> {
+    id: string,
+    user_id: string,
+}
+
+export type DeckWithRelations = { deck: DeckModel, user?: UserModel, progress?: DeckProgressModel };
+
+export interface DeckProgressModelServer {
+    _id: ObjectId,
+    user_id: ObjectId,
+    deck_id: ObjectId,
+    data: DeckProgressData,
+    created_at: Date;
+    updated_at: Date;
+}
+
+export interface DeckProgressModel extends Omit<DeckProgressModelServer, "_id" | "user_id" | "deck_id"> {
+    id: string,
+    user_id: string,
+    deck_id: string,
+}

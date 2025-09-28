@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import ThemeInitializer from "@/components/common/ThemeInitializer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,10 +26,35 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                if (typeof window !== 'undefined') {
+                  try {
+                    let theme = localStorage.getItem("theme");
+                    if(!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                      theme = "dark";
+                    }
+                    if (theme === "dark") {
+                      document.documentElement.classList.add("dark");
+                    } else {
+                      document.documentElement.classList.remove("dark");
+                    }
+                  } catch (e) {}
+                }
+              })();
+            `,
+          }}
+        /> */}
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ThemeInitializer>
+          {children}
+        </ThemeInitializer>
 
         <Toaster />
       </body>

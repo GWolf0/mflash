@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from './button'
 import { formatZodError } from '@/helpers/validationsHelper'
 import ErrorComp from './ErrorComp'
+import { Checkbox } from './checkbox'
 
 function MForm({formDef}: {
     formDef: FormDef,
@@ -22,18 +23,19 @@ function MForm({formDef}: {
     function renderFormItem(item: FormItem, data?: JSONType): React.ReactNode {
         switch(item.type) {
             case "text": return (
-                <Input name={item.name} defaultValue={data?.[item.name]} {...item.inputProps} />
+                <Input placeholder={strFormName(item.name)} name={item.name} defaultValue={data?.[item.name]} {...item.inputProps} />
             );
             case "text-lg": return (
-                <Textarea name={item.name} defaultValue={data?.[item.name]} {...item.inputProps} />
+                <Textarea placeholder={strFormName(item.name)} name={item.name} defaultValue={data?.[item.name]} {...item.inputProps} />
             );
             case "number": return (
-                <Input name={item.name} defaultValue={data?.[item.name]} {...item.inputProps} type='number' />
+                <Input placeholder={strFormName(item.name)} name={item.name} defaultValue={data?.[item.name]} {...item.inputProps} type='number' />
             );
             case "checkbox": return (
                 <div className='flex gap-4'>
+                    <Checkbox id={item.name} name={item.name} defaultChecked={data?.[item.name]} />
                     <Label htmlFor={item.name}>{strFormName(item.name)}</Label>
-                    <Input name={item.name} defaultChecked={data?.[item.name]} {...item.inputProps} type="checkbox" />
+                    {/* <Input name={item.name} defaultChecked={data?.[item.name]} {...item.inputProps} type="checkbox" /> */}
                 </div>
             );
             case "options": return (
@@ -44,7 +46,7 @@ function MForm({formDef}: {
                     <SelectContent>
                         {
                             item.meta?.options?.map((opt, i) => (
-                                <SelectItem key={i} value={opt.value}>{opt.label}</SelectItem>
+                                <SelectItem key={i} value={opt.value.toString()}>{opt.label}</SelectItem>
                             ))
                         }
                     </SelectContent>
@@ -94,8 +96,9 @@ function MForm({formDef}: {
         } else {
             setIsLoading(true);
             
-            const resDoe: DOE = await formDef.onJson(validatedJson);
+            const resDoe: DOE = await formDef.onJson(validatedJson.data);
             if(resDoe.error) setError(resDoe.error);
+            else setError(undefined);
 
             setIsLoading(false);
         }
@@ -115,7 +118,7 @@ function MForm({formDef}: {
             {/* // submit */}
             <div className='flex gap-4 justify-end'>
                 {formDef.options?.showReset && 
-                    <Button type="reset">Reset</Button>
+                    <Button type="reset" variant={"secondary"}>Reset</Button>
                 }
                 <Button type='submit'>{formDef.options?.submitLabel ?? "Submit"}</Button>
             </div>

@@ -17,9 +17,11 @@ function Logo({size, noLink}: {
     if(noLink) {
         return renderLogo();
     } else {
-        <Link href={"/"}>
-            {renderLogo()}
-        </Link>
+        return (
+            <Link href={"/"}>
+                {renderLogo()}
+            </Link>
+        )
     }
 
 }

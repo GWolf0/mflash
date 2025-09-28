@@ -2,7 +2,7 @@ import z from "zod";
 import { DOE, JSONType } from "./common";
 
 // form
-export type FormOptionType = {label: string, value: any};
+export type FormOptionType = {label: string, value: string | number};
 export type FormItemType = "text" | "text-lg" | "checkbox" | "number" | "options" | "custom";
 
 export interface FormItem {

@@ -2,37 +2,39 @@
 
 import { auth, signIn, signOut } from "@/lib/auth";
 import { DOE } from "@/types/common";
-import { AuthUser, UserModel } from "@/types/models";
+import { AuthUser, UserModel, UserModelServer } from "@/types/models";
 import { Session } from "next-auth";
 import { getDB } from "@/lib/db";
 import { ObjectId } from "mongodb";
+import { convertUserServerToUserClient } from "@/helpers/conversionHelper";
+import { AUTH_REDIRECT } from "@/constants/appConstants";
 
 // Get authenticated user (and ensure exists in DB)
 export async function requestAuthUser(): Promise<DOE<AuthUser>> {
     const doe: DOE<AuthUser> = { data: null, error: null };
-
+    
     try {
         const session: Session | null = await auth();
 
-        if (!session?.user?.email) {
+        if(!session?.user?.email) {
             doe.error = { message: "Not authenticated" };
             return doe;
         }
 
         const db = await getDB();
-        if (!db) {
+        if(!db) {
             doe.error = { message: "Database connection failed" };
             return doe;
         }
 
-        const usersColl = db.collection<UserModel>("users");
+        const usersColl = db.collection<UserModelServer>("users");
 
         // Try to find user by email
         let user = await usersColl.findOne({ email: session.user.email });
 
         // If user not found, create it
-        if (!user) {
-            const newUser: UserModel = {
+        if(!user) {
+            const newUser: UserModelServer = {
                 _id: new ObjectId(),
                 name: session.user.name ?? "",
                 email: session.user.email,
@@ -45,7 +47,7 @@ export async function requestAuthUser(): Promise<DOE<AuthUser>> {
             user = { ...newUser, _id: result.insertedId };
         }
 
-        doe.data = user;
+        doe.data = convertUserServerToUserClient(user);
     } catch (err) {
         console.error("requestAuthUser error", err);
         doe.error = { message: "Failed to fetch authenticated user!" };
@@ -56,7 +58,7 @@ export async function requestAuthUser(): Promise<DOE<AuthUser>> {
 
 // Login user
 export async function requestLogin(provider: "github") {
-    await signIn(provider, { redirectTo: "/" });
+    await signIn(provider, { redirectTo: AUTH_REDIRECT });
 }
 
 // Logout user

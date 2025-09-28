@@ -19,14 +19,15 @@ function ErrorComp({error, errorKey}: {
         );
     }
 
-    if(error.message) {
+    if(!errorKey && error.message) {
         return (
             renderError(error.message)
         );
     }
 
     return (
-        renderError("Unknown error!")
+        null
+        // renderError("Unknown error!")
     );
 
 }

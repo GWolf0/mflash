@@ -36,10 +36,27 @@ async function initDB() {
             properties: {
                 title: { bsonType: "string" },
                 data: { bsonType: "object" },
-                user_id: { bsonType: "string" },
                 description: { bsonType: "string" },
                 category: { bsonType: "string" },
                 is_private: { bsonType: "bool" },
+                created_at: { bsonType: "date" },
+                updated_at: { bsonType: "date" },
+                user_id: { bsonType: "objectId" },
+            }
+        }
+    }
+    }).catch(() => {});
+
+    // Decks Progress collection
+    await db.createCollection("decksProgress", {
+    validator: {
+        $jsonSchema: {
+            bsonType: "object",
+            required: ["user_id", "deck_id","data"],
+            properties: {
+                data: { bsonType: "object" },
+                user_id: { bsonType: "objectId" },
+                deck_id: { bsonType: "objectId" },
                 created_at: { bsonType: "date" },
                 updated_at: { bsonType: "date" },
             }

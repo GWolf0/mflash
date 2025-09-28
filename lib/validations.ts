@@ -1,10 +1,8 @@
-
 // ZOD definitions for creating and updating data (for forms)
 
 import { DECK_CATEGORIES } from "@/constants/deckAndCardsConstants";
 import { CARD_MAX_SCORE } from "@/constants/deckConstants";
 import limitsConstants from "@/constants/limitsConstants";
-import { ObjectId } from "mongodb";
 import z from "zod";
 
 // USER
@@ -29,6 +27,7 @@ export const VALIDATION_FLASH_CARD = z.object({
         enabled: z.boolean(),
     }),
 });
+export const VALIDATION_FLASH_CARD_PARTIAL = VALIDATION_FLASH_CARD.partial();
 
 // DECK DATA
 export const VALIDATION_DECK_DATA = z.object({
@@ -44,8 +43,8 @@ export const VALIDATION_DECK_CREATE = z.object({
     data: VALIDATION_DECK_DATA,
     created_at: z.coerce.date(),
     updated_at: z.coerce.date(),
-    user_id: z.instanceof(ObjectId),
+    user_id: z.string(),
 });
 
 // DECK (for update, makes all fields optional)
-export const VALIDATION_DECK_UPDATE = VALIDATION_DECK_CREATE.partial();
+export const VALIDATION_DECK_PARTIAL = VALIDATION_DECK_CREATE.partial();
