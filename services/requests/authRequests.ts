@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * Handle auth related requests
+ */
+
 import { auth, signIn, signOut } from "@/lib/auth";
 import { DOE } from "@/types/common";
 import { AuthUser, UserModel, UserModelServer } from "@/types/models";

@@ -1,14 +1,15 @@
 "use client"
 
-import { FlashCard } from '@/types/deck'
+import { FlashCard, FlashCardStats } from '@/types/deck'
 import React, { useState } from 'react'
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import CardEditor from './CardEditor';
+import DeckService from '@/services/systems/deckService';
 
-function CardComp({card, editMode, isSelected, onClick, onRequestDelete, onRequestEdit}: {
-    card: FlashCard, editMode?: boolean, isSelected?: boolean, onClick?: (e: React.MouseEvent) => any,
+function CardComp({card, stats, editMode, isSelected, onClick, onRequestDelete, onRequestEdit}: {
+    card: FlashCard, stats: FlashCardStats, editMode?: boolean, isSelected?: boolean, onClick?: (e: React.MouseEvent) => any,
     onRequestEdit?: (cardId: number) => any, onRequestDelete?: (cardId: number) => any,
 }) {
     // states
@@ -28,10 +29,10 @@ function CardComp({card, editMode, isSelected, onClick, onRequestDelete, onReque
                     {isFliped ? card.backSecondaryText : card.frontSecondaryText}
                 </p>
 
-                {
+                {/* {
                     isFliped && card.backExtraText &&
                     <Button>More</Button>
-                }
+                } */}
             </div>
         )
     }
@@ -54,14 +55,14 @@ function CardComp({card, editMode, isSelected, onClick, onRequestDelete, onReque
         return (
             <Popover>
                 <PopoverTrigger
-                    className={`absolute left-2 top-2 scale-75 bg-background text-foreground border rounded-full px-1 ${!card.stats.enabled&&'opacity-50'}`}
+                    className={`absolute left-2 top-2 scale-75 bg-background text-foreground border rounded-full px-1 ${!stats.enabled&&'opacity-50'}`}
                     onClick={(e)=>e.stopPropagation()}
                 >
-                    <i className='bi bi-info'></i>
+                    <i className='bi bi-info' style={{color: DeckService.getCardStatusColorFromCardScore(stats.score)}}></i>
                 </PopoverTrigger>
                 <PopoverContent side="bottom" align="start" style={{width: "fit-content"}}>
-                    <p className='text-xs'>Score: {card.stats.score}</p>
-                    <p className='text-xs'>Enabled: {card.stats.enabled ? "Yes" : "No"}</p>
+                    <p className='text-xs'>Score: {stats.score}</p>
+                    <p className='text-xs'>Enabled: {stats.enabled ? "Yes" : "No"}</p>
                 </PopoverContent>
             </Popover>
         )
@@ -78,7 +79,7 @@ function CardComp({card, editMode, isSelected, onClick, onRequestDelete, onReque
     }
 
     return (
-        <div className={`relative bg-secondary text-foreground rounded-lg border ${isFliped&&'border-dashed'} cursor-default ${isSelected&&'opacity-60'} ${editMode&&'select-none'}`} 
+        <div className={`relative bg-secondary text-foreground rounded-lg border ${isFliped&&'border-dashed border-primary'} cursor-default ${isSelected&&'opacity-60'} ${editMode&&'select-none'}`} 
             style={{aspectRatio: "0.7", transform: `rotateY(${isFliped?'180deg':'0deg'})`, transition: 'transform 0.3s'}}
             onClick={_onClick}    
         >

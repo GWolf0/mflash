@@ -1,3 +1,8 @@
+/**
+ * Models (db)
+ * With server version and client version
+ */
+
 import { DeckData, DeckProgressData } from "./deck";
 import { ObjectId } from "mongodb";
 
@@ -14,6 +19,7 @@ export interface UserModel extends Omit<UserModelServer, "_id"> {
     id: string;
 }
 
+// AuthUser (the authenticated user), can be a UserModel or no value
 export type AuthUser = UserModel | null | undefined;
 
 export interface DeckModelServer {

@@ -1,36 +1,120 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Flashy
+*A simple flashcard web app built with Next.js, NextAuth, and MongoDB.*
 
-## Getting Started
+## Table of Contents
 
-First, run the development server:
+- [Overview](#overview)  
+- [Features](#features)  
+- [Tech Stack](#tech-stack)  
+- [Database Schema](#database-schema)  
+- [Project Structure](#project-structure-key-files)  
+- [Pages](#pages)  
+- [Setup & Installation](#setup--installation)  
+- [Authentication](#authentication)  
+- [Spaced Repetition System (SRS)](#spaced-repetition-system-srs)  
+- [Screenshots](#screenshots)  
+- [License & Notes](#license--notes) 
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Overview
+Flashy is a flashcard maker web app with a simple spaced repetition system.  
+This is the **public MVP version**, intended as a portfolio project.  
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Features
+- Create and manage custom flashcard decks  
+- Review decks with a spaced repetition method  
+- Test through simple multichoice quiz  
+- Authentication via GitHub (NextAuth)  
+- Responsive design (desktop & mobile friendly)  
+- Clean and simple UI  
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
+- **Frontend:** Next.js (App Router), React, TailwindCSS  
+- **Auth:** NextAuth (GitHub provider)  
+- **Database:** MongoDB (native driver)  
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Database Schema
+- Three main collections:
+   - Users
+   - Decks
+   - DecksProgress
 
-## Learn More
+## Project Structure (key files)
+- **./app:** (pages and api routes)
+- **./types:** (type definitions)
+- **./services/requests:** (requests) 
+- **./services/systems:** (core services)
+- **./lib/auth.ts:** (auth config)
+- **./lib/db.ts:** (db config)
+- **./lib/validations.ts:** (zod validations)
+- **./helpers:** (helper utilities)  
+- **./scripts:** (useful scripts)
+- **./components:** (UI components) 
+- **./constants:** (app constants)  
+- **./middleware.ts:** (Next.js middleware)  
+- **./.env.example:** (environment variable sample)
+- **./\_\_tests\_\_:** (test folder)
 
-To learn more about Next.js, take a look at the following resources:
+## Pages
+- **/:** (placeholder for home page)
+- **/auth/login:** (login page, ***requires guest***)
+- **/decks:** (list decks created by current auth user, ***requires auth***)
+- **/decks/{deck_id}:** (display deck cards and allow edit, ***requires auth***)
+- **/review/{deck_id}:** (review page)
+- **/test/{deck_id}:** (test page)
+- **/common/{misc_page}:** (placeholders for other pages)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Setup & Installation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Clone the repo**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/flashy-public.git
+   ```
+2. **Install dependencies**
+   ```bash
+   npm i
+   ```
+3. **Setup environment variables**  
+Copy .env.example into .env.local and fill in the required values.
+4. **Requirements**  
+   - Mongodb Compass (for local/dev environement)
+   - Mongosh (to run scripts)
+5. **Run utility scripts**  
+   - Setup db collections
+      ```bash
+      ./scripts/initDB.bat
+      ```
+   - Seed db
+      ```bash
+      ./scripts/seedDB.bat
+      ```
+   ⚠️ These scripts are Windows-specific (.bat).  
+   On macOS/Linux, run the corresponding .js files manually with mongosh.
+6. **Run server**
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+## Authentication
+Uses GitHub OAuth (NextAuth v5 beta).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Make sure to configure your GitHub OAuth app with the correct Authorization callback URL:
+http://localhost:3000/api/auth/callback/github
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Spaced Repetition System (SRS)
+- This app implements a simple priority-based SRS
+- Cards gain/lose priority based on review history and a score
+- Cards not seen in a while and with low score will surface first
+- Small randomness is applied to avoid repetition bias
+
+## Screenshots
+![login page](./public/screenshots/ss%201.jpeg "Login page")
+![decks page](./public/screenshots/ss%202.jpeg "Decks page")
+![decks page light theme](./public/screenshots/ss%203.jpeg "Decks page light theme")
+![deck page](./public/screenshots/ss%204.jpeg "Deck page")
+![deck page light theme](./public/screenshots/ss%205.jpeg "Deck page light theme")
+![review page](./public/screenshots/ss%206.jpeg "Review page")
+![test page](./public/screenshots/ss%207.jpeg "Test page")
+
+## License & Notes
+This version is mainly for portfolio purposes.  
+Feel free to fork and experiment, the planned full SaaS version will remain private.

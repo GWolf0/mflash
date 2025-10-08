@@ -1,5 +1,11 @@
 "use client"
 
+/**
+ * MForm
+ * Handles rendering and state handling of a form component
+ * Defined by a FormDef object
+ */
+
 import { DOE, ErrorType, JSONType } from '@/types/common'
 import { FormDef, FormItem } from '@/types/ui'
 import React, { useState } from 'react'
@@ -12,6 +18,7 @@ import { Button } from './button'
 import { formatZodError } from '@/helpers/validationsHelper'
 import ErrorComp from './ErrorComp'
 import { Checkbox } from './checkbox'
+import { LoaderCircle } from 'lucide-react'
 
 function MForm({formDef}: {
     formDef: FormDef,
@@ -85,6 +92,7 @@ function MForm({formDef}: {
         // make sure to append boolean fields with unchecked status
         formDef.items.filter((item) => item.type === "checkbox").forEach((item) => {
             if(!formData.has(item.name)) json[item.name] = false;
+            else json[item.name] = true;
         });
 
         // validate if validation exists
@@ -120,7 +128,13 @@ function MForm({formDef}: {
                 {formDef.options?.showReset && 
                     <Button type="reset" variant={"secondary"}>Reset</Button>
                 }
-                <Button type='submit'>{formDef.options?.submitLabel ?? "Submit"}</Button>
+                <Button type='submit' disabled={loading}>
+                    {
+                        loading ?
+                        <LoaderCircle className='animate-spin' /> :
+                        formDef.options?.submitLabel ?? "Submit"
+                    }
+                </Button>
             </div>
 
         </form>

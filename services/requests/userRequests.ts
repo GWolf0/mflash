@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * Handles users related requests
+ */
+
 import { Db, ObjectId } from "mongodb";
 import { DOE } from "@/types/common";
 import { UserModel, DeckModel, UserModelServer, DeckModelServer } from "@/types/models";
@@ -48,14 +52,15 @@ export async function requestSearchUsers(term: string, filters: Partial<UserMode
 }
 
 // Get user's decks
-export async function requestUserDecks(id: string): Promise<DOE<DeckModel[]>> {
+export async function requestUserDecks(id: string, authUserId: string): Promise<DOE<DeckModel[]>> {
     const doe: DOE<DeckModel[]> = { data: null, error: null };
 
     try {
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
-        const query: any = { user_id: new ObjectId(id) };
+        const isOwner: boolean = id === authUserId;
+        const query: any = isOwner ? { user_id: new ObjectId(id) } : { user_id: new ObjectId(id), is_private: false };
 
         const decks = await db.collection<DeckModelServer>("decks").find(query).toArray();
         doe.data = decks.map(d => convertDeckServerToDeckClient(d));
@@ -90,10 +95,13 @@ export async function requestCreateUser(data: Omit<UserModel, "id">): Promise<DO
 }
 
 // Update user
-export async function requestUpdateUser(id: string, data: Partial<Omit<UserModel, "id">>): Promise<DOE<UserModel>> {
+export async function requestUpdateUser(id: string, authUserId: string, data: Partial<Omit<UserModel, "id">>): Promise<DOE<UserModel>> {
     const doe: DOE<UserModel> = { data: null, error: null };
 
     try {
+        if (!ObjectId.isValid(authUserId)) throw new Error(`Unauthenticated`);
+        if(id != authUserId) throw new Error(`Action not authorized`);
+        
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
@@ -102,8 +110,10 @@ export async function requestUpdateUser(id: string, data: Partial<Omit<UserModel
             { $set: { ...data, updated_at: new Date() } }
         );
 
-        const user = await db.collection<UserModel>("users").findOne({ _id: new ObjectId(id) });
-        doe.data = user;
+        const user = await db.collection<UserModelServer>("users").findOne({ _id: new ObjectId(id) });
+        if(user) {
+            doe.data = convertUserServerToUserClient(user);
+        }
     } catch (e: any) {
         doe.error = { message: e.message };
     }
@@ -112,31 +122,34 @@ export async function requestUpdateUser(id: string, data: Partial<Omit<UserModel
 }
 
 // Delete user
-export async function requestDeleteUser(id: string, deleteDecks: boolean = true): Promise<DOE<boolean>> {
-    const doe: DOE<boolean> = { data: null, error: null };
+export async function requestDeleteUser(id: string, authUserId: string, deletePublicDecks: boolean = true): Promise<DOE<boolean>> {
+    const doe: DOE<boolean> = { data: false, error: null };
 
     try {
+        if (!ObjectId.isValid(authUserId)) throw new Error(`Unauthenticated`);
+        if(id != authUserId) throw new Error(`Action not authorized`);
+
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
         const result = await db.collection("users").deleteOne({ _id: new ObjectId(id) });
 
         // delete all user's related data
-        if (deleteDecks) {
-            // find all deck IDs created by the user
-            const decks = await db.collection("decks")
-                .find({ user_id: new ObjectId(id) })
-                .project({ _id: 1 })
-                .toArray();
+        // find all deck IDs created by the user
+        const decks = await db.collection("decks")
+            .find(deletePublicDecks ? { user_id: new ObjectId(id) } : { user_id: new ObjectId(id), is_private: true })
+            .project({ _id: 1 })
+            .toArray();
 
-            const deckIds = decks.map(d => d._id);
+        const deckIds = decks.map(d => d._id);
 
-            // delete decks and their progress
-            await Promise.all([
-                db.collection("decks").deleteMany({ user_id: new ObjectId(id) }),
-                db.collection("decksProgress").deleteMany({ $or: [{ deck_id: { $in: deckIds } }, { user_id: new ObjectId(id) }] })
-            ]);
-        }
+        // delete decks and their progress
+        await Promise.all([
+            db.collection<DeckModelServer>("decks").deleteMany(
+                { _id: {$in: deckIds} }
+            ),
+            db.collection("decksProgress").deleteMany({ $or: [{ deck_id: { $in: deckIds } }, { user_id: new ObjectId(id) }] })
+        ]);
 
         doe.data = result.deletedCount === 1;
     } catch (e: any) {

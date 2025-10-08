@@ -1,7 +1,13 @@
+/**
+ * Theme service
+ * - handles theme related logic
+ */
+
 export default class ThemeService {
     static SAVE_KEY = "theme";
     static currentTheme: ThemeService;
 
+    // toggle/set theme type
     static toggleTheme(value?: ThemeType) {
         if (!window) return;
 
@@ -14,10 +20,12 @@ export default class ThemeService {
         ThemeService.saveTheme(value);
     }
 
+    // assume dark theme if dark class on document element
     static isDarkTheme(): boolean {
         return document.documentElement.classList.contains("dark");
     }
 
+    // load current theme from ls
     static loadCurrentTheme(): ThemeType {
         if (!window) return ThemeService.getDefaultTheme();
 
@@ -26,10 +34,12 @@ export default class ThemeService {
         return ThemeService.getDefaultTheme();
     }
 
+    // save theme to ls
     static saveTheme(value: ThemeType) {
         localStorage.setItem(ThemeService.SAVE_KEY, value.toString());
     }
 
+    // get default theme
     static getDefaultTheme(): ThemeType {
         if(!window) return "light";
 

@@ -7,17 +7,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import MSelect from '@/components/ui/MSelect';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MIN_CARDS_FOR_REVIEW } from '@/constants/deckConstants';
+import { strTruncate } from '@/helpers/formatingHelper';
 import DeckService from '@/services/systems/deckService';
 import { FlashCard } from '@/types/deck';
-import { DeckModel } from '@/types/models';
+import { AuthUser, DeckModel, DeckProgressModel, DeckWithRelations, UserModel } from '@/types/models';
 import React, { useEffect, useState } from 'react'
 
-function DeckReviewClientPage({ deck }: {
-    deck: DeckModel
+function DeckReviewClientPage({ deckWithRelations, authUser }: {
+    deckWithRelations: DeckWithRelations, authUser: AuthUser,
 }) {
+    const deck: DeckModel = deckWithRelations.deck;
+    const deckOwner: UserModel = deckWithRelations.user!;
+    const [progress, setProgress] = useState<DeckProgressModel>(deckWithRelations.progress!);
+
     const [screen, setScreen] = useState<"start" | "main" | "end">("start");
     const [options, setOptions] = useState<DeckReviewOptions>(DEFAULT_DECK_REVIEW_OPTIONS);
     const [reviewed, setReviewed] = useState<FlashCard[]>([]);
+
+    useEffect(() => {
+        // sync progress data
+        setProgress(prev => ({ ...prev, data: DeckService.getSyncedDeckProgressDataWithDeckData(progress.data, deck.data) }));
+    }, []);
 
     // options received from start screen
     function onReceiveOptions(options: DeckReviewOptions) {
@@ -39,14 +50,14 @@ function DeckReviewClientPage({ deck }: {
     // render screen
     function renderScreen(): React.ReactNode {
         switch (screen) {
-            case "start": return <DeckReviewStartScreen deck={deck} onConfirmOptions={onReceiveOptions} />;
-            case "main": return <DeckReviewMainScreen deck={deck} options={options} onReviewEnded={onReviewEnded} onRestart={onRequestRestart} />;
+            case "start": return <DeckReviewStartScreen deck={deck} onConfirmOptions={onReceiveOptions} deckOwner={deckOwner} />;
+            case "main": return <DeckReviewMainScreen deck={deck} progress={progress} options={options} onReviewEnded={onReviewEnded} onRestart={onRequestRestart} />;
             case "end": return <DeckReviewEndScreen reviewed={reviewed} onRestart={onRequestRestart} />;
         }
     }
 
     return (
-        <MainLayout>
+        <MainLayout authUser={authUser}>
 
             {renderScreen()}
 
@@ -58,9 +69,13 @@ function DeckReviewClientPage({ deck }: {
 export default DeckReviewClientPage;
 
 // start screen
-function DeckReviewStartScreen({ deck, onConfirmOptions }: {
-    deck: DeckModel, onConfirmOptions: (options: DeckReviewOptions) => any,
+function DeckReviewStartScreen({ deck, onConfirmOptions, deckOwner }: {
+    deck: DeckModel, onConfirmOptions: (options: DeckReviewOptions) => any, deckOwner: UserModel,
 }): React.ReactNode {
+
+    function canStart(): boolean {
+        return deck.data.cards.length >= MIN_CARDS_FOR_REVIEW;
+    }
 
     function onSubmitOptionsForm(e: React.FormEvent) {
         e.preventDefault();
@@ -75,7 +90,14 @@ function DeckReviewStartScreen({ deck, onConfirmOptions }: {
 
     return (
         <main className='w-full min-h-screen flex flex-col gap-8'>
-            <h1 className='underline'>Review: {deck.title}</h1>
+            <div className='flex flex-col gap-2'>
+                <h1 className='underline'>Review: {strTruncate(deck.title, 48)}</h1>
+                <p className='text-sm'>by {deckOwner.name ?? "No Name"}</p>
+            </div>
+
+            {!canStart() &&
+                <p className='text-destructive'>Cannot start review, minimum cards required ({MIN_CARDS_FOR_REVIEW})</p>
+            }
 
             {/* // options form */}
             <form className='w-full flex flex-col gap-4' onSubmit={onSubmitOptionsForm}>
@@ -102,7 +124,7 @@ function DeckReviewStartScreen({ deck, onConfirmOptions }: {
                 </div>
 
                 <div className='flex items-center justify-end'>
-                    <Button type='submit'>Confirm</Button>
+                    <Button type='submit' disabled={!canStart()}>Confirm</Button>
                 </div>
             </form>
         </main>
@@ -112,9 +134,10 @@ function DeckReviewStartScreen({ deck, onConfirmOptions }: {
 
 // Deck main screen
 function DeckReviewMainScreen({
-    deck, options, onReviewEnded, onRestart,
+    deck, options, onReviewEnded, onRestart, progress,
 }: {
-    deck: DeckModel, options: DeckReviewOptions, onReviewEnded: (reviewed: FlashCard[]) => any, onRestart: () => any,
+    deck: DeckModel, options: DeckReviewOptions, progress: DeckProgressModel,
+    onReviewEnded: (reviewed: FlashCard[]) => any, onRestart: () => any,
 }): React.ReactNode {
     const [reviewed, setReviewed] = useState<FlashCard[]>([]);
     const [curCards, setCurCards] = useState<FlashCard[]>([]);
@@ -126,8 +149,8 @@ function DeckReviewMainScreen({
     function getNextCards(reviewedList: FlashCard[]): FlashCard[] {
         const remaining = options.cardsCount - reviewedList.length;
         const requestCount = Math.min(options.cardsPerView, remaining);
-        
-        return DeckService.suggestCardsForReview(deck.data.cards, reviewedList, requestCount);
+
+        return DeckService.suggestCardsForReview(deck.data.cards, progress.data.cardsStats, reviewedList, requestCount);
     }
 
     function onNextBtn() {
@@ -166,7 +189,7 @@ function DeckReviewMainScreen({
             >
                 {curCards.map((c) => (
                     <div key={c.id} style={{ width: "100%" }}>
-                        <CardComp card={c} />
+                        <CardComp card={c} stats={DeckService.getCardStatsFromProgress(c.id, progress.data)} />
                     </div>
                 ))}
             </div>

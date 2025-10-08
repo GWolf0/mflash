@@ -1,17 +1,17 @@
 "use client"
 
-import { FlashCard } from '@/types/deck'
+import { DeckData, FlashCard } from '@/types/deck'
 import React, { useMemo } from 'react'
 import MForm from '../ui/MForm';
 import DeckService from '@/services/systems/deckService';
 import { DOE, JSONType } from '@/types/common';
 import { VALIDATION_FLASH_CARD_PARTIAL } from '@/lib/validations';
 
-function CardEditor({card, cards, onCardData}: {
-    card?: FlashCard, cards: FlashCard[], onCardData: (card: FlashCard) => any,
+function CardEditor({card, deckData, onCardData}: {
+    card?: FlashCard, deckData: DeckData, onCardData: (card: FlashCard) => any,
 }) {
     const mode = card != undefined ? "edit" : "create";
-    const _card = card != undefined ? {...card} : DeckService.makeNewCardInstance({}, cards);
+    const _card = card != undefined ? {...card} : DeckService.makeNewCardInstance({}, deckData);
 
     async function onJson(json: JSONType): Promise<DOE> {
         const cardData: FlashCard = {..._card, ...json};

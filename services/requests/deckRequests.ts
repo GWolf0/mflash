@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * Handles decks related requests
+ */
+
 import { Db, ObjectId } from "mongodb";
 import { DOE } from "@/types/common";
 import { DeckModel, DeckModelServer, DeckProgressModel, DeckProgressModelServer, DeckWithRelations, UserModel, UserModelServer } from "@/types/models";
@@ -18,11 +22,13 @@ export async function requestGetDeckById(
     const doe: DOE<DeckWithRelations> = { data: null, error: null };
 
     try {
+        if(!ObjectId.isValid(authUserId)) authUserId = new ObjectId().toString()
+
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
-        const deck = await db.collection<DeckModelServer>("decks").findOne({ _id: new ObjectId(id) });
-        if (!deck) throw new Error("Deck not found");
+        const deck = await db.collection<DeckModelServer>("decks").findOne({ _id: new ObjectId(id), $or: [ {is_private: false}, {is_private: true, user_id: new ObjectId(authUserId)} ] });
+        if (!deck) throw new Error("Deck not found or private");
 
         // Run relational queries in parallel
         const [user, deckProgress] = await Promise.all([
@@ -49,7 +55,7 @@ export async function requestGetDeckById(
         if (withRelations.includes("progress")) {
             if (!deckProgress && authUserId) {
                 // create progress for first-time user
-                const deckProgressDoe = await requestCreateDeckProgress(progress);
+                const deckProgressDoe = await requestCreateDeckProgress(progress, authUserId);
                 if (!deckProgressDoe.data) throw new Error("Couldn't create deck progress instance");
                 progress = deckProgressDoe.data;
             } else if (deckProgress) {
@@ -73,15 +79,18 @@ export async function requestGetDeckById(
 export async function requestSearchDecks(
     term: string,
     filters: Partial<DeckModel> = {},
+    authUserId: string,
     withRelations: ("user")[] = []
 ): Promise<DOE<DeckWithRelations[]>> {
     const doe: DOE<DeckWithRelations[]> = { data: null, error: null };
 
     try {
+        if(!authUserId) throw new Error(`User not authenticated`);
+
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
-        const query: any = { ...filters };
+        const query: any = { ...filters, $or: [ {is_private: false}, {is_private: true, user_id: new ObjectId(authUserId)} ] };
         if (term) {
             query.title = { $regex: term, $options: "i" }; // case-insensitive search
         }
@@ -133,22 +142,29 @@ export async function requestCreateDeck(
     const doe: DOE<DeckModel> = { data: null, error: null };
 
     try {
+        if (!ObjectId.isValid(authUserId)) throw new Error(`Unauthenticated`);
+
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
         const result = await db.collection("decks").insertOne({
             ...data,
+            user_id: new ObjectId(authUserId),
             created_at: new Date(),
             updated_at: new Date(),
         });
 
         const deck = await db.collection<DeckModelServer>("decks").findOne({ _id: result.insertedId });
+        if(!deck) throw new Error(`Error couldn't create deck model`);
 
         // create deck progress for auth user with this deck
         if (deck) {
-            await requestCreateDeckProgress(
-                DeckService.makeNewDeckProgressModelInstance(deck._id.toString(), authUserId, deck.data.cards)
+            const progressModel: DOE<DeckProgressModel> = await requestCreateDeckProgress(
+                DeckService.makeNewDeckProgressModelInstance(deck._id.toString(), authUserId, deck.data.cards),
+                authUserId
             );
+
+            if(!progressModel.data) throw new Error(`Error couldn't create progress model`);
         }
 
         doe.data = deck ? convertDeckServerToDeckClient(deck) : null;
@@ -162,28 +178,32 @@ export async function requestCreateDeck(
 // Update deck
 export async function requestUpdateDeck(
     id: string,
+    authUserId: string,
     data: Partial<Omit<DeckModel, "id">>
 ): Promise<DOE<DeckModel>> {
-    const doe: DOE<DeckModel> = { data: null, error: null };
+    let doe: DOE<DeckModel> = { data: null, error: null };
 
     try {
+        if (!ObjectId.isValid(authUserId)) throw new Error(`Unauthenticated`);
+
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
         let updateData: any = { ...data, updated_at: new Date() };
         if (data.user_id) updateData.user_id = new ObjectId(data.user_id);
 
-        await db.collection("decks").updateOne(
-            { _id: new ObjectId(id) },
+        const res = await db.collection("decks").updateOne(
+            { _id: new ObjectId(id), user_id: new ObjectId(authUserId) },
             { $set: updateData }
         );
 
-        const deck = await db.collection<DeckModelServer>("decks").findOne({ _id: new ObjectId(id) });
-        doe.data = deck ? convertDeckServerToDeckClient(deck) : null;
+        if(res.modifiedCount === 1) {
+            const deck = await db.collection<DeckModelServer>("decks").findOne({ _id: new ObjectId(id) });
+            doe.data = deck ? convertDeckServerToDeckClient(deck) : null;
+        }
     } catch (e: any) {
-        doe.error = { message: e.message };
+        doe.error = { message: e.message};
     }
-
     return doe;
 }
 
@@ -192,13 +212,15 @@ export async function requestDeleteDeck(
     id: string,
     authUserId: string
 ): Promise<DOE<boolean>> {
-    const doe: DOE<boolean> = { data: null, error: null };
+    const doe: DOE<boolean> = { data: false, error: null };
 
     try {
+        if (!ObjectId.isValid(authUserId)) throw new Error(`Unauthenticated`);
+        
         const db = await getDB();
         if (!db) throw new Error("Database connection failed");
 
-        const result = await db.collection("decks").deleteOne({ _id: new ObjectId(id) });
+        const result = await db.collection("decks").deleteOne({ _id: new ObjectId(id), user_id: new ObjectId(authUserId) });
 
         // delete auth user progress also
         await db.collection("deckProgress").deleteOne({

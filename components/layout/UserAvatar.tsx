@@ -9,7 +9,7 @@ function UserAvatar({user}: {
 
     return (
         <Avatar>
-            <AvatarImage src={user.image ?? undefined} />
+            <AvatarImage src={user.image ?? `/profile_pic.png`} />
             <AvatarFallback>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
     )

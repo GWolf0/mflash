@@ -1,16 +1,25 @@
+import { APP_NAME } from '@/constants/appConstants';
 import Link from 'next/link';
 import React from 'react'
 
-function Logo({size, noLink}: {
-    size?: number, noLink?: boolean,
+function Logo({size, noLink, withText}: {
+    size?: number, noLink?: boolean, withText?: "right" | "bottom",
 }) {
-    size = size ?? 64;
+    size = size ?? 32;
 
     function renderLogo(): React.ReactNode {
         return (
-            <div>
-                <img src="/next.svg" alt="logo" width={size} height={size} />
+            <div className={`flex items-center justify-center ${withText==='bottom'&&"flex-col"} gap-4`}>
+                <img src="/logo.png" alt="logo" width={size} height={size} />
+                { renderText() }
             </div>
+        )
+    }
+
+    function renderText(): React.ReactNode{
+        if(!withText) return null;
+        return (
+            <p className='text-2xl md:text-4xl'>{APP_NAME.toUpperCase()}</p>
         )
     }
 

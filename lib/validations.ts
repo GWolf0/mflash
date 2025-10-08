@@ -1,7 +1,8 @@
-// ZOD definitions for creating and updating data (for forms)
+/**
+ * ZOD definitions for validations (forms, etc)
+ */
 
-import { DECK_CATEGORIES } from "@/constants/deckAndCardsConstants";
-import { CARD_MAX_SCORE } from "@/constants/deckConstants";
+import { CARD_MAX_SCORE, DECK_CATEGORIES } from "@/constants/deckConstants";
 import limitsConstants from "@/constants/limitsConstants";
 import z from "zod";
 
@@ -12,20 +13,15 @@ export const VALIDATION_USER = z.object({
     created_at: z.coerce.date(),
     updated_at: z.coerce.date(),
 });
+export const VALIDATION_USER_PARTIAL = VALIDATION_USER.partial();
 
 // FLASH CARD
 export const VALIDATION_FLASH_CARD = z.object({
     id: z.number(),
-    frontMainText: z.string().min(1).max(32),
-    frontSecondaryText: z.string().max(32).optional(),
-    backMainText: z.string().min(1).max(32),
-    backSecondaryText: z.string().max(32).optional(),
-    backExtraText: z.string().max(128).optional(),
-    stats: z.object({
-        score: z.number().min(-CARD_MAX_SCORE).max(CARD_MAX_SCORE),
-        lastViewed: z.coerce.date().nullable(),
-        enabled: z.boolean(),
-    }),
+    frontMainText: z.string().min(1).max(64),
+    frontSecondaryText: z.string().max(64).optional(),
+    backMainText: z.string().min(1).max(64),
+    backSecondaryText: z.string().max(64).optional(),
 });
 export const VALIDATION_FLASH_CARD_PARTIAL = VALIDATION_FLASH_CARD.partial();
 

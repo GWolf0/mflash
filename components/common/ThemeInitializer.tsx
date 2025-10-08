@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Theme initializer component
+ * Wrap main app content
+ * render main app content after theme is initalized
+ */
+
 import { useEffect, useState, ReactNode } from "react";
 import ThemeService, { ThemeType } from "@/services/systems/themeService";
 

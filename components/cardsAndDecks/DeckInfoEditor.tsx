@@ -1,10 +1,12 @@
-import React from 'react'
+"use client"
+
+import React, { useState } from 'react'
 import MForm from '../ui/MForm'
 import { DeckModel } from '@/types/models'
 import DeckService from '@/services/systems/deckService';
 import { DOE, JSONType } from '@/types/common';
-import { DECK_CATEGORIES } from '@/constants/deckAndCardsConstants';
 import { VALIDATION_DECK_CREATE, VALIDATION_DECK_PARTIAL } from '@/lib/validations';
+import { DECK_CATEGORIES } from '@/constants/deckConstants';
 
 function DeckInfoEditor({deck, onDeckData}: {
     deck?: DeckModel, onDeckData: (deck: DeckModel) => any,
@@ -12,9 +14,15 @@ function DeckInfoEditor({deck, onDeckData}: {
     const mode = deck != undefined ? "edit" : "create";
     const _deck = deck != undefined ? {...deck} : DeckService.makeNewDeckInstance({});
 
+    const [justEdited, setJustEdited] = useState<boolean>(false);
+
     async function onJson(json: JSONType): Promise<DOE> {
+        if(justEdited) return {data: true, error: null};
+
         const deckData: DeckModel = {..._deck, ...json};
         onDeckData(deckData);
+
+        setJustEdited(true);
 
         return {data: true, error: null};
     } 

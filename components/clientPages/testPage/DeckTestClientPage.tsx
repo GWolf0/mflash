@@ -7,42 +7,83 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import MSelect from '@/components/ui/MSelect';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CARD_MAX_SCORE } from '@/constants/deckConstants';
+import { CARD_MAX_SCORE, MIN_CARDS_FOR_REVIEW } from '@/constants/deckConstants';
 import { shuffleArray } from '@/helpers/dataHelper';
+import { strTruncate } from '@/helpers/formatingHelper';
 import DeckService from '@/services/systems/deckService';
-import { DeckData, FlashCard } from '@/types/deck';
-import { DeckModel } from '@/types/models';
+import SaveService from '@/services/systems/saveService';
+import { DeckData, DeckProgressData, FlashCard, FlashCardStats } from '@/types/deck';
+import { AuthUser, DeckModel, DeckProgressModel, DeckWithRelations, UserModel } from '@/types/models';
+import { LoaderCircleIcon } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner';
 
-function DeckTestClientPage({ deck }: {
-    deck: DeckModel
+function DeckTestClientPage({ deckWithRelations, authUser }: {
+    deckWithRelations: DeckWithRelations, authUser: AuthUser,
 }) {
+    const deck: DeckModel = deckWithRelations.deck;
+    const deckOwner: UserModel = deckWithRelations.user!;
+    const [progress, setProgress] = useState<DeckProgressModel>({...deckWithRelations.progress!, data: DeckService.getSyncedDeckProgressDataWithDeckData(deckWithRelations.progress!.data, deck.data)});
+
     const [screen, setScreen] = useState<"start" | "main" | "end">("start");
     const [options, setOptions] = useState<DeckTestOptions>(DEFAULT_DECK_TEST_OPTIONS);
     const [reviewed, setReviewed] = useState<FlashCard[]>([]);
     const [mistakes, setMistakes] = useState<number[]>([]); // mistakes: ids of cards answered incorrectly
     const [score, setScore] = useState<number>(0);
+    const [isSavingProgress, setIsSavingProgress] = useState<boolean>(false);
+    const [progressSavedSuccess, setProgressSavedSuccess] = useState<boolean>(true);
+
+    // render fns
+    function renderSavingIndicator(): React.ReactNode {
+        return (
+            <div className='fixed bottom-0 right-0 py-4 px-8 bg-background text-foreground flex items-center gap-4'>
+                <p className='text-xs md:text-sm'>
+                    <LoaderCircleIcon className='animate-spin' />
+                    Saving
+                </p>
+            </div>
+        )
+    }
 
     // options received from start screen
     function onReceiveOptions(options: DeckTestOptions) {
+        if (isSavingProgress) return;
+
         setOptions(options);
         setScreen("main");
     }
 
     // on review ended
-    function onTestEnded(_reviewed: FlashCard[], _mistakes: number[], _score: number) {
+    async function onTestEnded(_reviewed: FlashCard[], _mistakes: number[], _score: number) {
         setReviewed(_reviewed);
         setMistakes(_mistakes);
         setScore(_score);
         setScreen("end");
 
+        if (isSavingProgress) return;
+        setIsSavingProgress(true);
+
         // update deck with new data
-        const updatedData: DeckData = updateCardsStatsAndGetUpdatedDeckData(_reviewed, _mistakes);
+        const updatedProgressData: DeckProgressData = updateCardsStatsAndGetUpdatedDeckData(_reviewed, _mistakes);
+        const updatedProgress: DeckProgressModel = { ...progress, data: updatedProgressData };
+        setProgress(updatedProgress);
+
         // request update
+        const doe = await SaveService.saveDeckProgress(updatedProgress, authUser?.id ?? "");
+        if (!doe.data) {
+            toast(`Error saving progress data`);
+            setProgressSavedSuccess(false);
+        } else {
+            setProgressSavedSuccess(true);
+        }
+
+        setIsSavingProgress(false);
     }
 
     // on request restart
     function onRequestRestart() {
+        if (isSavingProgress) return;
+
         setScreen("start");
         setReviewed([]);
         setMistakes([]);
@@ -50,41 +91,44 @@ function DeckTestClientPage({ deck }: {
     }
 
     // update reviewed cards stats
-    function updateCardsStatsAndGetUpdatedDeckData(reviewedCards: FlashCard[], mistakeIds: number[]): DeckData {
+    function updateCardsStatsAndGetUpdatedDeckData(reviewedCards: FlashCard[], mistakeIds: number[]): DeckProgressData {
         // setup reviewed cards updated stats
-        const newCardsState: FlashCard[] = reviewedCards.map((c) => {
+        const newCardsStats: FlashCardStats[] = reviewedCards.map((c) => {
             const wasWrong: boolean = mistakeIds.includes(c.id);
             const incrementStep = CARD_MAX_SCORE / 4;
-            return {
-                ...c,
-                stats: {
-                    ...c.stats,
+            const stats: FlashCardStats | undefined = progress.data.cardsStats.find(s => s.cardId === c.id);
+            if (stats) {
+                return {
+                    ...stats,
                     lastViewed: Date.now(),
-                    score: Math.min(CARD_MAX_SCORE, Math.max(-CARD_MAX_SCORE, c.stats.score + (wasWrong ? -incrementStep : incrementStep)))
+                    score: Math.min(CARD_MAX_SCORE, Math.max(-CARD_MAX_SCORE, stats.score + (wasWrong ? -incrementStep : incrementStep)))
                 }
+            } else {
+                return DeckService.getDefaultCardStats(c.id)
             }
         });
 
-        const reviewedMap = new Map(newCardsState.map(c => [c.id, c]));
+        const reviewedMap = new Map(newCardsStats.map(s => [s.cardId, s]));
         return {
-            ...deck.data,
-            cards: deck.data.cards.map(c => reviewedMap.get(c.id) ?? c)
+            cardsStats: progress.data.cardsStats.map(s => reviewedMap.get(s.cardId) ?? s)
         };
     }
 
     // render screen
     function renderScreen(): React.ReactNode {
         switch (screen) {
-            case "start": return <DeckTestStartScreen deck={deck} onConfirmOptions={onReceiveOptions} />;
-            case "main": return <DeckTestMainScreen deck={deck} options={options} onTestEnded={onTestEnded} onRestart={onRequestRestart} />;
-            case "end": return <DeckTestEndScreen reviewed={reviewed} mistakes={mistakes} score={score} onRestart={onRequestRestart} />;
+            case "start": return <DeckTestStartScreen deck={deck} onConfirmOptions={onReceiveOptions} deckOwner={deckOwner} />;
+            case "main": return <DeckTestMainScreen deck={deck} options={options} progress={progress} onTestEnded={onTestEnded} onRestart={onRequestRestart} />;
+            case "end": return <DeckTestEndScreen reviewed={reviewed} mistakes={mistakes} score={score} onRestart={onRequestRestart} progressSavedSuccess={progressSavedSuccess} />;
         }
     }
 
     return (
-        <MainLayout>
+        <MainLayout authUser={authUser}>
 
             {renderScreen()}
+
+            {isSavingProgress && renderSavingIndicator()}
 
         </MainLayout>
     )
@@ -94,12 +138,18 @@ function DeckTestClientPage({ deck }: {
 export default DeckTestClientPage;
 
 // start screen
-function DeckTestStartScreen({ deck, onConfirmOptions }: {
-    deck: DeckModel, onConfirmOptions: (options: DeckTestOptions) => any,
+function DeckTestStartScreen({ deck, onConfirmOptions, deckOwner }: {
+    deck: DeckModel, onConfirmOptions: (options: DeckTestOptions) => any, deckOwner: UserModel,
 }): React.ReactNode {
+
+    function canStart(): boolean {
+        return deck.data.cards.length >= MIN_CARDS_FOR_REVIEW;
+    }
 
     function onSubmitOptionsForm(e: React.FormEvent) {
         e.preventDefault();
+        if (!canStart()) return;
+
         const fd: FormData = new FormData(e.currentTarget as HTMLFormElement);
 
         const cardsCount = Number(fd.get("cardsCount")!.toString());
@@ -111,7 +161,14 @@ function DeckTestStartScreen({ deck, onConfirmOptions }: {
 
     return (
         <main className='w-full min-h-screen flex flex-col gap-8'>
-            <h1 className='underline'>Test: {deck.title}</h1>
+            <div className='flex flex-col gap-2'>
+                <h1 className='underline'>Test: {strTruncate(deck.title, 48)}</h1>
+                <p className='text-sm'>by {deckOwner.name ?? "No Name"}</p>
+            </div>
+
+            {!canStart() &&
+                <p className='text-destructive'>Cannot start test, minimum cards required ({MIN_CARDS_FOR_REVIEW})</p>
+            }
 
             {/* // options form */}
             <form className='w-full flex flex-col gap-4' onSubmit={onSubmitOptionsForm}>
@@ -141,7 +198,7 @@ function DeckTestStartScreen({ deck, onConfirmOptions }: {
                 </div>
 
                 <div className='flex items-center justify-end'>
-                    <Button type='submit'>Confirm</Button>
+                    <Button type='submit' disabled={!canStart()}>Confirm</Button>
                 </div>
             </form>
         </main>
@@ -151,9 +208,10 @@ function DeckTestStartScreen({ deck, onConfirmOptions }: {
 
 // Deck main screen
 function DeckTestMainScreen({
-    deck, options, onTestEnded, onRestart,
+    deck, options, progress, onTestEnded, onRestart,
 }: {
-    deck: DeckModel, options: DeckTestOptions, onTestEnded: (reviewed: FlashCard[], mistakes: number[], score: number) => any, onRestart: () => any,
+    deck: DeckModel, options: DeckTestOptions, progress: DeckProgressModel,
+    onTestEnded: (reviewed: FlashCard[], mistakes: number[], score: number) => any, onRestart: () => any,
 }): React.ReactNode {
     const [reviewed, setReviewed] = useState<FlashCard[]>([]);
     const [curCard, setCurCard] = useState<FlashCard>(DeckService.makeNewCardInstance({}));
@@ -177,7 +235,7 @@ function DeckTestMainScreen({
     }
 
     function getNextCard(reviewedList: FlashCard[]): FlashCard {
-        return DeckService.suggestCardsForReview(deck.data.cards, reviewedList, 1)[0];
+        return DeckService.suggestCardsForReview(deck.data.cards, progress.data.cardsStats, reviewedList, 1)[0];
     }
 
     function getOptionsCards(curCard: FlashCard): FlashCard[] {
@@ -186,7 +244,7 @@ function DeckTestMainScreen({
     }
 
     function onCardChoiceBtn(selectedCard: FlashCard) {
-        if(answerFeedbackPause) return;
+        if (answerFeedbackPause) return;
 
         const newReviewed = [...reviewed, curCard];
         const correct = curCard.id === selectedCard.id;
@@ -196,11 +254,11 @@ function DeckTestMainScreen({
         lastUserAnswer.current = selectedCard.id;
 
         setReviewed(newReviewed);
-        if(!correct) setMistakes(newMistakes);
+        if (!correct) setMistakes(newMistakes);
 
-        if(hasEnded(newReviewed)) {
+        if (hasEnded(newReviewed)) {
             onEnd(newReviewed, newMistakes, newScore);
-        }else {
+        } else {
             setAnswerFeedbackPause(true);
             setScore(newScore);
 
@@ -212,7 +270,12 @@ function DeckTestMainScreen({
     }
 
     function onEnd(finalTested: FlashCard[], mistakes: number[], score: number) {
-        onTestEnded(finalTested, mistakes, score);
+        setAnswerFeedbackPause(true);
+
+        setTimeout(() => {
+            onTestEnded(finalTested, mistakes, score);
+            setAnswerFeedbackPause(false);
+        }, 2000);
     }
 
     function hasEnded(reviewedList: FlashCard[] = reviewed): boolean {
@@ -220,10 +283,10 @@ function DeckTestMainScreen({
     }
 
     function getChoiceBtnClasses(choiceCard: FlashCard): string {
-        if(!answerFeedbackPause) return `bg-foreground text-background`;
+        if (!answerFeedbackPause) return `bg-foreground text-background`;
 
-        if(choiceCard.id === curCard.id) return `bg-green-500 text-background`; // correct
-        if(choiceCard.id === lastUserAnswer.current)
+        if (choiceCard.id === curCard.id) return `bg-green-500 text-background`; // correct
+        if (choiceCard.id === lastUserAnswer.current)
             return `bg-destructive text-background`; // wrong
 
         return `bg-foreground text-background`;
@@ -266,15 +329,22 @@ function DeckTestMainScreen({
 }
 
 // end screen
-function DeckTestEndScreen({ reviewed, onRestart, mistakes, score }: {
-    reviewed: FlashCard[], onRestart: () => any, mistakes: number[], score: number,
+function DeckTestEndScreen({ reviewed, onRestart, mistakes, score, progressSavedSuccess }: {
+    reviewed: FlashCard[], onRestart: () => any, mistakes: number[], score: number, progressSavedSuccess: boolean,
 }): React.ReactNode {
 
     return (
         <main className='w-full min-h-screen flex flex-col gap-8 items-center'>
             <p className='text-4xl'>Test Ended ({reviewed.length})</p>
-            
+
             <p className='text-3xl'>Score: {score}/{reviewed.length}</p>
+
+            <p className={`${!progressSavedSuccess?'text-destructive':'text-foreground'}`}>
+                {progressSavedSuccess ?
+                    "Progress saved successfully" :
+                    "Error saving progress (maybe not logged in)"
+                }
+            </p>
 
             <Button onClick={onRestart}>
                 <i className='bi bi-arrow-counterclockwise'></i> Restart
